@@ -20,7 +20,7 @@ const encoder = new TextEncoder();
 const staticCache:Uint8ArrayByString = {};
 const staticCacheVersions:StringByString = {};
 
-export const try_files = (
+export function try_files (
     next:(request: Request)=>Promise<Response> = async _request => await new Response('Not Found',{status:404}),//app pages & endpoints
     {
         port = 8080,
@@ -31,7 +31,7 @@ export const try_files = (
         byteRangeChunk = 1024 * 256,
         beforeClose = async function(){},
     }:try_files_options = {}
-) => {
+) {
     
     //BUILD FUNCTIONS based on user options
     let addCORS = function(_request: Request, responseHeaders: Headers){return responseHeaders;};
@@ -287,7 +287,7 @@ const base64abc = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "
  * Encodes a given Uint8Array, ArrayBuffer or string into RFC4648 base64 representation
  * @param data
  */
-export function base64_encode(data: string|Uint8Array|ArrayBuffer): string {
+function base64_encode(data: string|Uint8Array|ArrayBuffer): string {
     const uint8 = typeof data === "string"
         ? encoder.encode(data)
         : data instanceof Uint8Array
