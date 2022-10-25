@@ -5,7 +5,7 @@ A Deno server for efficiently serving static files and passing unknown URLs to y
 If you use a "public" dir for your project,
 try running this from your project directory:
 ```bash
-deno run --allow-net --allow-read https://deno.land/x/try_files/server.js
+deno run --allow-net --allow-read https://deno.land/x/try_files/server.ts
 ```
 
 ## Features
@@ -21,7 +21,7 @@ deno run --allow-net --allow-read https://deno.land/x/try_files/server.js
 This simple script uses try_files to serve static assets from the "public" directory 
 before serving our custom page, which should also provide the 404 response when an app route is not found.
 ```javascript
-import { try_files } from "https://deno.land/x/try_files/mod.js";
+import { try_files } from "https://deno.land/x/try_files/mod.ts";
 
 try_files(async function(request){
     let { pathname } = new URL(request.url);
@@ -35,7 +35,7 @@ try_files(async function(request){
 This example builds on the previous one and demonstrates the options available
 to modify how try_files works:
 ```javascript
-import { try_files } from "https://deno.land/x/try_files/mod.js";
+import { try_files } from "https://deno.land/x/try_files/mod.ts";
 
 const options = {
     port:8080,

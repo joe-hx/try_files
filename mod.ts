@@ -1,28 +1,42 @@
+import {FileInfo} from "https://deno.land/x/oak@v10.6.0/etag.ts";
+
+export interface try_files_options {
+    port?:number;
+    filesDir?:string;
+    index?:string;
+    corsMatch?:string|RegExp;
+    memoryCache?:boolean;
+    byteRangeChunk?:number;
+    beforeClose?:()=>Promise<void>;
+}
+interface StringByString {
+    [key: string]: string;
+}
+interface Uint8ArrayByString {
+    [key: string]: Uint8Array;
+}
 
 const encoder = new TextEncoder();
-const staticCache = {};
-const staticCacheVersions = {};
+const staticCache:Uint8ArrayByString = {};
+const staticCacheVersions:StringByString = {};
 
 export const try_files = (
-    next = async function(request){return new Response('Not Found',{status:404})},//app pages & endpoints
+    next:(request: Request)=>Promise<Response> = async _request => await new Response('Not Found',{status:404}),//app pages & endpoints
     {
         port = 8080,
         filesDir = 'public',
         index = 'index.html',
-        /**
-         * @type {string|RegExp}
-         */
         corsMatch = undefined, // string=simple GET mode for *; RegExp=dynamic, max permissions}
         memoryCache = false,
         byteRangeChunk = 1024 * 256,
         beforeClose = async function(){},
-    } = {}
+    }:try_files_options = {}
 ) => {
     
     //BUILD FUNCTIONS based on user options
-    let addCORS = function(request, responseHeaders){return responseHeaders;};
+    let addCORS = function(_request: Request, responseHeaders: Headers){return responseHeaders;};
     if(corsMatch === '*'){
-        addCORS = function(request, responseHeaders){
+        addCORS = function(_request, responseHeaders){
             responseHeaders.append('access-control-allow-origin', '*');
             responseHeaders.append('access-control-allow-methods', 'OPTIONS,HEAD,GET');
             responseHeaders.append('access-control-allow-headers', '*');//allow anything except Authorization when not using credentials
@@ -51,10 +65,7 @@ export const try_files = (
         if(pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.substring(0, pathname.length-1);
         
         //START RESPONSE
-        /**
-         * @type {null|string|Uint8Array}
-         */
-        let responseData = null;
+        let responseData:null|string|Uint8Array = null;
         const headers = new Headers();
         
         //OPTIONS: 204 no content, cors
@@ -85,17 +96,14 @@ export const try_files = (
                 }
                 if(finfo){
                     //FILE EXTENSION
-                    /**
-                     * @type {RegExpMatchArray|string}
-                     */
-                    let ext = filename.toLowerCase().match(/^.+\.(\w+)$/);
+                    let ext:RegExpMatchArray|string|null = filename.toLowerCase().match(/^.+\.(\w+)$/);
                     if(ext) ext = ext[1];//get match
                     
                     //last-modified header vs if-modified-since, possible 304
                     if(finfo.mtime){
                         headers.append('last-modified', finfo.mtime.toUTCString());
                         const ifModSince = request.headers.get('if-modified-since');
-                        if(ifModSince && finfo.mtime > Date.parse(ifModSince)){
+                        if(ifModSince && finfo.mtime > new Date(Date.parse(ifModSince))){
                             //it has not been modified, return 304
                             return new Response(null, {
                                 status: 304,
@@ -106,14 +114,15 @@ export const try_files = (
                     
                     //we didn't 304, continue trying to serve the file -- accept byte ranges
                     headers.set('accept-ranges','bytes');
-                    let start = 0, end = 0, length = finfo.size;
+                    let length = finfo.size;
+                    let start = 0;
+                    let end = length - 1;
                     const range = request.headers.get('range');
                     let isServingRange = false;
                     if(range && !isIndex){
                         const matches = range.match(/bytes=(\d+)-(\d+)?/);
-                        start = matches[1] ?? 0;
-                        if(start) start = parseInt(start);
-                        if(matches[2] !== undefined){
+                        start = matches && matches[1] ? parseInt(matches[1]) : 0;
+                        if(matches && matches[2] !== undefined){
                             //specific range
                             end = parseInt(matches[2]);
                         } else {
@@ -129,7 +138,7 @@ export const try_files = (
                         }
                     }
                     //always set length so we can send it with empty HEAD requests
-                    headers.append('content-length', length);
+                    headers.append('content-length', length.toString());
                     
                     //cache some static assets in memory, but refresh based on ?search
                     if(!isIndex && memoryCache){
@@ -179,7 +188,7 @@ export const try_files = (
                     }
                     
                     //always set mime types w/ catchall
-                    if(ext in mimeTypes) headers.append('content-type', mimeTypes[ext]);
+                    if(ext && ext in mimeTypes) headers.append('content-type', mimeTypes[ext] as string);
                     else headers.append('content-type','application/octet-stream');
                     
                     //SUCCESS
@@ -215,10 +224,13 @@ export const try_files = (
 
 
 //serve() wraps listen() so we can just return a Response
-export function serve(handler = async request => new Response('Hello World'), {
-    port = 8080,
-    beforeClose = async function(){},
-}){
+export function serve(
+    handler:(req:Request)=>Promise<Response> = async _request => await new Response('Hello World'),
+    {
+        port = 8080,
+        beforeClose = async function(){},
+    }
+){
     listen(async function (request, respond) {
         try {
             respond(await handler(request))
@@ -229,10 +241,13 @@ export function serve(handler = async request => new Response('Hello World'), {
     }, {port,beforeClose}).catch(err => console.error(new Date(), 'Error from listen()', err));
 }
 
-async function listen(handler = async (request,respond) => respond(new Response('Hello World')), {
-    port = 8080,
-    beforeClose = async function(){},
-}){
+async function listen(
+    handler:(request:Request,respond:(response:Response)=>void)=>Promise<void> = async function(_request,respond){respond(await new Response('Hello World'))},
+    {
+        port = 8080,
+        beforeClose = async function(){},
+    }
+){
     const server = Deno.listen({port});
     
     Deno.addSignalListener('SIGINT', async function(){
@@ -243,7 +258,7 @@ async function listen(handler = async (request,respond) => respond(new Response(
         Deno.exit();
     })
     
-    async function _serveHttp(conn) {
+    async function _serveHttp(conn: Deno.Conn) {
         for await (const e of Deno.serveHttp(conn)) {
             e.respondWith(new Promise(function(resolve){
                 //do not await or it will block other requests
@@ -272,7 +287,7 @@ const base64abc = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "
  * Encodes a given Uint8Array, ArrayBuffer or string into RFC4648 base64 representation
  * @param data
  */
-export function base64_encode(data) {
+export function base64_encode(data: string|Uint8Array|ArrayBuffer): string {
     const uint8 = typeof data === "string"
         ? encoder.encode(data)
         : data instanceof Uint8Array
@@ -307,7 +322,7 @@ export function base64_encode(data) {
  * Decodes a given RFC4648 base64 encoded string
  * @param b64
  */
-function base64_decode(b64) {
+/*function base64_decode(b64: string): Uint8Array {
     const binString = atob(b64);
     const size = binString.length;
     const bytes = new Uint8Array(size);
@@ -315,25 +330,25 @@ function base64_decode(b64) {
         bytes[i] = binString.charCodeAt(i);
     }
     return bytes;
-}
+}*/
 
 //thank you oak
-async function calculate(entity, weak = true) {
+async function calculate(entity: string|Uint8Array|FileInfo, weak = true): Promise<string> {
     const tag = isFileInfo(entity)
-        ? calcStatTag(entity)
-        : await calcEntityTag(entity);
+        ? calcStatTag(entity as FileInfo)
+        : await calcEntityTag(entity as string|Uint8Array);
     
     return weak ? `W/${tag}` : tag;
 }
-function isFileInfo(value) {
+function isFileInfo(value: string|Uint8Array|FileInfo): boolean {
     return Boolean(value && typeof value === "object" && "mtime" in value && "size" in value);
 }
-function calcStatTag(entity) {
+function calcStatTag(entity: FileInfo): string {
     const mtime = entity.mtime?.getTime().toString(16) ?? "0";
     const size = entity.size.toString(16);
     return `"${size}-${mtime}"`;
 }
-async function calcEntityTag(entity) {
+async function calcEntityTag(entity: string|Uint8Array): Promise<string> {
     if (entity.length === 0) return `"0-2jmj7l5rSw0yVb/vlWAYkK/YBwk="`;
     if (typeof entity === "string") {
         entity = encoder.encode(entity);
@@ -343,7 +358,7 @@ async function calcEntityTag(entity) {
 }
 
 //handle most common assets, fallback to octet-stream
-const mimeTypes = {
+const mimeTypes:StringByString = {
 
     //scripts & styles
     css: 'text/css',
