@@ -1,2 +1,2 @@
-import {try_files} from "./try_files.js";
+import {try_files} from "./mod.js";
 try_files();

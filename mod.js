@@ -3,28 +3,6 @@ const encoder = new TextEncoder();
 const staticCache = {};
 const staticCacheVersions = {};
 
-const mimeTypes = {
-    css: 'text/css',
-    js: 'text/javascript',
-    jpg: 'image/jpg',
-    jpeg: 'image/jpeg',
-    png: 'image/png',
-    webp: 'image/webp',
-    avif: 'image/avif',
-    gif: 'image/gif',
-    ico: 'image/ico',
-    svg: 'image/svg+xml',
-    json: 'application/json',
-    txt: 'text/plain',
-    map: 'text/plain',
-    htm: 'text/html',
-    html: 'text/html',
-    xml: 'text/xml',
-    mp3: 'audio/mp3',
-    wav: 'audio/wav',
-    mp4: 'video/mp4',
-}
-
 export const try_files = (
     next = async function(request){return new Response('Not Found',{status:404})},//app pages & endpoints
     {
@@ -174,8 +152,7 @@ export const try_files = (
                         await Deno.close(file.rid);
                     } else {
                         //READ ENTIRE FILE
-                        // todo this is just a fallback for deno deploy index.html files
-                        //  remove this entire block if moving to digitalocean
+                        // todo this is a fallback for deno deploy not supporting Deno.seek
                         responseData = await Deno.readFile(filename);
                     }
                     
@@ -363,4 +340,69 @@ async function calcEntityTag(entity) {
     }
     const hash = base64_encode(await crypto.subtle.digest("SHA-1", entity)).substring(0, 27);
     return `"${entity.length.toString(16)}-${hash}"`;
+}
+
+//handle most common assets, fallback to octet-stream
+const mimeTypes = {
+
+    //scripts & styles
+    css: 'text/css',
+    js:  'text/javascript',
+    map: 'text/plain',
+
+    //text
+    txt:  'text/plain',
+    htm:  'text/html',
+    html: 'text/html',
+    xml:  'text/xml',
+    ini:  'text/plain',
+    conf: 'text/plain',
+    yaml: 'text/yaml',
+    yml:  'text/yaml',
+
+    //images
+    jpeg: 'image/jpeg',
+    jpg:  'image/jpeg',
+    bmp:  'image/bmp',
+    png:  'image/png',
+    apng: 'image/apng',
+    webp: 'image/webp',
+    avif: 'image/avif',
+    gif:  'image/gif',
+    ico:  'image/ico',
+    svg:  'image/svg+xml',
+
+    //audio
+    mp3:  'audio/mp3',
+    wav:  'audio/wav',
+    ogg:  'audio/ogg',
+    aac:  'audio/x-aac',
+    m4a:  'audio/x-m4a',
+    aiff: 'audio/x-aiff',
+    flac: 'audio/x-flac',
+    weba: 'audio/webm',
+    midi: 'audio/midi',
+
+    //video
+    mp4:  'video/mp4',
+    mpeg: 'video/mpeg',
+    mpg:  'video/mpeg',
+    webm: 'video/webm',
+    avi:  'video/x-msvideo',
+    '3gp':'video/3gpp',
+    mov:  'video/quicktime',
+    mkv:  'video/x-matroska',
+    flv:  'video/x-flv',
+
+    //fonts
+    otf:  'font/otf',
+    ttf:  'font/ttf',
+    woff: 'font/woff',
+    woff2:'font/woff2',
+
+    //applications
+    json: 'application/json',
+    pdf:  'application/pdf',
+    zip:  'application/zip',
+    gz:   'application/gzip',
 }
