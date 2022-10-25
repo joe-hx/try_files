@@ -1,4 +1,3 @@
-import {FileInfo} from "https://deno.land/x/oak@v10.6.0/etag.ts";
 
 export interface try_files_options {
     port?:number;
@@ -32,7 +31,7 @@ export function try_files (
         beforeClose = async function(){},
     }:try_files_options = {}
 ) {
-    
+
     //BUILD FUNCTIONS based on user options
     let addCORS = function(_request: Request, responseHeaders: Headers){return responseHeaders;};
     if(corsMatch === '*'){
@@ -54,20 +53,20 @@ export function try_files (
             return responseHeaders;
         }
     }
-    
-    
-    
+
+
+
     /**
      * @type Request
      */
     return serve(async function(request){
         let { pathname, search } = new URL(request.url);
         if(pathname.length > 1 && pathname.endsWith('/')) pathname = pathname.substring(0, pathname.length-1);
-        
+
         //START RESPONSE
         let responseData:null|string|Uint8Array = null;
         const headers = new Headers();
-        
+
         //OPTIONS: 204 no content, cors
         if(request.method === 'OPTIONS'){
             return new Response(null, {
@@ -75,14 +74,14 @@ export function try_files (
                 headers: addCORS(request, headers),
             });
         }
-        
+
         //GET | HEAD: we can try files
         if(request.method === 'GET' || request.method === 'HEAD'){
-            
+
             try { //TRY FILES
-                let filename = `./${filesDir}${pathname}`;
+                let filename = `./${filesDir}${decodeURI(pathname)}`;
                 const requestedFile = await Deno.stat(filename);
-                
+
                 let finfo, isIndex = false;
                 if(requestedFile.isFile){
                     finfo = requestedFile;
@@ -98,7 +97,7 @@ export function try_files (
                     //FILE EXTENSION
                     let ext:RegExpMatchArray|string|null = filename.toLowerCase().match(/^.+\.(\w+)$/);
                     if(ext) ext = ext[1];//get match
-                    
+
                     //last-modified header vs if-modified-since, possible 304
                     if(finfo.mtime){
                         headers.append('last-modified', finfo.mtime.toUTCString());
@@ -111,7 +110,7 @@ export function try_files (
                             });
                         }
                     }
-                    
+
                     //we didn't 304, continue trying to serve the file -- accept byte ranges
                     headers.set('accept-ranges','bytes');
                     let length = finfo.size;
@@ -139,7 +138,7 @@ export function try_files (
                     }
                     //always set length so we can send it with empty HEAD requests
                     headers.append('content-length', length.toString());
-                    
+
                     //cache some static assets in memory, but refresh based on ?search
                     if(!isIndex && memoryCache){
                         if(!staticCache[pathname] || search !== staticCacheVersions[pathname]){
@@ -164,8 +163,8 @@ export function try_files (
                         // todo this is a fallback for deno deploy not supporting Deno.seek
                         responseData = await Deno.readFile(filename);
                     }
-                    
-                    
+
+
                     //didn't return a range, check etag - possible 304 again
                     const ifNoneMatch = request.headers.get('if-none-match');
                     if(!finfo.mtime || ifNoneMatch){
@@ -179,18 +178,18 @@ export function try_files (
                             });
                         }
                     }
-                    
+
                     //set max cache headers for files with extensions (unless isIndex)
                     if(ext && !isIndex){
                         headers.append('cache-control','public, max-age=31536000');
                     } else {
                         headers.append('cache-control','no-cache');
                     }
-                    
+
                     //always set mime types w/ catchall
                     if(ext && ext in mimeTypes) headers.append('content-type', mimeTypes[ext] as string);
                     else headers.append('content-type','application/octet-stream');
-                    
+
                     //SUCCESS
                     if(request.method === 'GET'){
                         return new Response(responseData, {
@@ -211,7 +210,7 @@ export function try_files (
                 }
             }
         }
-        
+
         //APP ROUTER - no response, hand off to app
         const response = await next(request);
         addCORS(request, response.headers);//successful app responses add cors too
@@ -249,7 +248,7 @@ async function listen(
     }
 ){
     const server = Deno.listen({port});
-    
+
     Deno.addSignalListener('SIGINT', async function(){
         console.log('Shutting down server');
         await beforeClose();
@@ -257,7 +256,7 @@ async function listen(
         console.log('Goodbye!')
         Deno.exit();
     })
-    
+
     async function _serveHttp(conn: Deno.Conn) {
         for await (const e of Deno.serveHttp(conn)) {
             e.respondWith(new Promise(function(resolve){
@@ -266,9 +265,9 @@ async function listen(
             })).catch(err => console.error(new Date(), 'Error from respondWith()', err))
         }
     }
-    
+
     console.log(`Listening on http://localhost:${port}/`);
-    
+
     for await (const conn of server) {
         //do not await or it will block other connections
         _serveHttp(conn).catch(err => console.error(new Date(), 'Error from _serveHttp()', err));
@@ -333,17 +332,17 @@ function base64_encode(data: string|Uint8Array|ArrayBuffer): string {
 }*/
 
 //thank you oak
-async function calculate(entity: string|Uint8Array|FileInfo, weak = true): Promise<string> {
+async function calculate(entity: string|Uint8Array|Deno.FileInfo, weak = true): Promise<string> {
     const tag = isFileInfo(entity)
-        ? calcStatTag(entity as FileInfo)
+        ? calcStatTag(entity as Deno.FileInfo)
         : await calcEntityTag(entity as string|Uint8Array);
-    
+
     return weak ? `W/${tag}` : tag;
 }
-function isFileInfo(value: string|Uint8Array|FileInfo): boolean {
+function isFileInfo(value: string|Uint8Array|Deno.FileInfo): boolean {
     return Boolean(value && typeof value === "object" && "mtime" in value && "size" in value);
 }
-function calcStatTag(entity: FileInfo): string {
+function calcStatTag(entity: Deno.FileInfo): string {
     const mtime = entity.mtime?.getTime().toString(16) ?? "0";
     const size = entity.size.toString(16);
     return `"${size}-${mtime}"`;
