@@ -49,6 +49,8 @@ export function try_files (
                 responseHeaders.append('access-control-allow-methods', 'OPTIONS,HEAD,GET,POST,PATCH,PUT,DELETE');
                 //have to specify everything when allowing credentials
                 responseHeaders.append('access-control-allow-headers', 'Accept,Accept-Language,Authorization,Cache-Control,If-Modified-Since,Content-Language,Content-Type,Expires,Last-Modified,Pragma,Range,User-Agent,X-Requested-With');
+                responseHeaders.append('access-control-allow-credentials', 'true');
+                responseHeaders.append('access-control-max-age', '604800');//cache for 7 days
             }
             return responseHeaders;
         }
