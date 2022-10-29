@@ -260,6 +260,7 @@ async function listen(
     })
 
     async function _serveHttp(conn: Deno.Conn) {
+        //todo do something with conn.remoteAddr
         for await (const e of Deno.serveHttp(conn)) {
             e.respondWith(new Promise(function(resolve){
                 //do not await or it will block other requests
