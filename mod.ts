@@ -288,7 +288,7 @@ const base64abc = ["A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "
  * Encodes a given Uint8Array, ArrayBuffer or string into RFC4648 base64 representation
  * @param data
  */
-function base64_encode(data: string|Uint8Array|ArrayBuffer): string {
+export function base64_encode(data: string|Uint8Array|ArrayBuffer): string {
     const uint8 = typeof data === "string"
         ? encoder.encode(data)
         : data instanceof Uint8Array
@@ -323,7 +323,7 @@ function base64_encode(data: string|Uint8Array|ArrayBuffer): string {
  * Decodes a given RFC4648 base64 encoded string
  * @param b64
  */
-/*function base64_decode(b64: string): Uint8Array {
+export function base64_decode(b64: string): Uint8Array {
     const binString = atob(b64);
     const size = binString.length;
     const bytes = new Uint8Array(size);
@@ -331,7 +331,7 @@ function base64_encode(data: string|Uint8Array|ArrayBuffer): string {
         bytes[i] = binString.charCodeAt(i);
     }
     return bytes;
-}*/
+}
 
 //thank you oak
 async function calculate(entity: string|Uint8Array|Deno.FileInfo, weak = true): Promise<string> {
