@@ -380,6 +380,8 @@ const mimeTypes:StringByString = {
     //images
     jpeg: 'image/jpeg',
     jpg:  'image/jpeg',
+    jfif: 'image/jpeg',
+    jfi:  'image/jpeg',
     bmp:  'image/bmp',
     png:  'image/png',
     apng: 'image/apng',
