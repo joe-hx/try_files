@@ -148,21 +148,21 @@ export function try_files (
                             staticCacheVersions[pathname] = search;
                         }
                         responseData = staticCache[pathname].slice(start, start+length);
-                    } else if(Deno.seek) {
+                    } else if(Deno.FsFile?.seek) {
                         //READ FILE
                         responseData = new Uint8Array(length);
                         const file = await Deno.open(filename,{read:true});
-                        await Deno.seek(file.rid,start,Deno.SeekMode.Start);
+                        await file.seek(start,Deno.SeekMode.Start);
                         let bytesRead = 0;
                         while(bytesRead < length){
-                            const n = await Deno.read(file.rid, responseData);
+                            const n = await file.read(responseData);
                             if(n) bytesRead += n;
                             else break;
                         }
-                        await Deno.close(file.rid);
+                        await file.close();
                     } else {
                         //READ ENTIRE FILE
-                        // todo this is a fallback for deno deploy not supporting Deno.seek
+                        // todo this is a fallback for deno deploy not supporting seek
                         responseData = await Deno.readFile(filename);
                     }
 
@@ -224,7 +224,6 @@ export function try_files (
 }
 
 
-//serve() wraps listen() so we can just return a Response
 export function serve(
     handler:(req:Request)=>Promise<Response> = async _request => await new Response('Hello World'),
     {
@@ -232,50 +231,24 @@ export function serve(
         beforeClose = async function(){},
     }
 ){
-    listen(async function (request, respond) {
+    const server = Deno.serve({port},async request => {
         try {
-            respond(await handler(request))
+            return await handler(request);
         } catch (err){
             console.error(new Date(), 'Error from handler()', err);
-            respond(new Response('Server Error',{status:500}));
+            return new Response('Server Error',{status:500});
         }
-    }, {port,beforeClose}).catch(err => console.error(new Date(), 'Error from listen()', err));
-}
-
-async function listen(
-    handler:(request:Request,respond:(response:Response)=>void)=>Promise<void> = async function(_request,respond){respond(await new Response('Hello World'))},
-    {
-        port = 8080,
-        beforeClose = async function(){},
-    }
-){
-    const server = Deno.listen({port});
+    });
 
     Deno.addSignalListener('SIGINT', async function(){
         console.log('Shutting down server');
         await beforeClose();
-        await server.close();
+        if(server.close) await server.close();
         console.log('Goodbye!')
         Deno.exit();
-    })
-
-    async function _serveHttp(conn: Deno.Conn) {
-        //todo do something with conn.remoteAddr
-        for await (const e of Deno.serveHttp(conn)) {
-            e.respondWith(new Promise(function(resolve){
-                //do not await or it will block other requests
-                handler(e.request, resolve);
-            })).catch(err => console.error(new Date(), 'Error from respondWith()', err))
-        }
-    }
-
-    console.log(`Listening on http://localhost:${port}/`);
-
-    for await (const conn of server) {
-        //do not await or it will block other connections
-        _serveHttp(conn).catch(err => console.error(new Date(), 'Error from _serveHttp()', err));
-    }
+    });
 }
+
 
 
 
