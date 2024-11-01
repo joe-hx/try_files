@@ -1,4 +1,7 @@
 
+//check if on deno deploy
+const isDenoDeploy = Deno.env.get("DENO_DEPLOYMENT_ID") !== undefined;
+
 export interface try_files_options {
     port?:number;
     filesDir?:string;
@@ -113,14 +116,14 @@ export function try_files (
                         }
                     }
 
-                    //we didn't 304, continue trying to serve the file -- accept byte ranges
-                    headers.set('accept-ranges','bytes');
+                    //we didn't 304, continue trying to serve the file -- accept byte ranges unless deno deploy
+                    if(!isDenoDeploy) headers.set('accept-ranges','bytes');
                     let length = finfo.size;
                     let start = 0;
                     let end = length - 1;
                     const range = request.headers.get('range');
                     let isServingRange = false;
-                    if(range && !isIndex){
+                    if(range && !isIndex && !isDenoDeploy){
                         const matches = range.match(/bytes=(\d+)-(\d+)?/);
                         start = matches && matches[1] ? parseInt(matches[1]) : 0;
                         if(matches && matches[2] !== undefined){
@@ -148,7 +151,7 @@ export function try_files (
                             staticCacheVersions[pathname] = search;
                         }
                         responseData = staticCache[pathname].slice(start, start+length);
-                    } else if(Deno.FsFile) {
+                    } else if(!isDenoDeploy) {
                         //READ FILE
                         responseData = new Uint8Array(length);
                         const file = await Deno.open(filename,{read:true});
@@ -159,10 +162,9 @@ export function try_files (
                             if(n) bytesRead += n;
                             else break;
                         }
-                        await file.close();
+                        file.close();
                     } else {
                         //READ ENTIRE FILE
-                        // todo this is a fallback for deno deploy not supporting seek
                         responseData = await Deno.readFile(filename);
                     }
 
