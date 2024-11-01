@@ -148,7 +148,7 @@ export function try_files (
                             staticCacheVersions[pathname] = search;
                         }
                         responseData = staticCache[pathname].slice(start, start+length);
-                    } else if(Deno.FsFile?.seek) {
+                    } else if(Deno.FsFile) {
                         //READ FILE
                         responseData = new Uint8Array(length);
                         const file = await Deno.open(filename,{read:true});
@@ -243,7 +243,7 @@ export function serve(
     Deno.addSignalListener('SIGINT', async function(){
         console.log('Shutting down server');
         await beforeClose();
-        if(server.close) await server.close();
+        if(server.shutdown) await server.shutdown();
         console.log('Goodbye!')
         Deno.exit();
     });
